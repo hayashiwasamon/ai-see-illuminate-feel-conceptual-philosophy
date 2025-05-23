@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIは「見る」「照らす」「感じる」ことができるのか？ — 統合ウェブマガジン</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.birds.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.rings.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.clouds2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.globe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tween24@latest/tween24.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db; /* クイズ用 */
+            --secondary-color: #2ecc71; /* クイズ用 */
+            --accent-color: #e67e22; /* クイズ用 */
+            --text-color-dark: #333; /* クイズ用 */
+            --light-text-color: #f8f9fa; /* クイズ用 */
+            --quiz-bg-color: #fdfdfd; /* クイズ用 */
+            --quiz-container-bg-color: #ffffff; /* クイズ用 */
+            --border-radius: 8px; /* クイズ用 */
+            --box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); /* クイズ用 */
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            color: #e0e0e0; /* Vanta背景に合わせて明るい色に */
+            line-height: 1.8;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background-color: #020205; /* Vantaの背景色と合わせる */
+        }
+
+        #vanta-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .vanta-slot {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease-in-out;
+            opacity: 0;
+        }
+        .vanta-slot.hidden-top { transform: translateY(-100%); opacity: 0; }
+        .vanta-slot.hidden-bottom { transform: translateY(100%); opacity: 0; }
+        .vanta-slot.active { transform: translateY(0%); opacity: 1; }
+
+        .page-wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        #sidebar-trigger {
+            position: fixed;
+            top: 20px; 
+            left: 20px;
+            z-index: 110; /* サイドバーより手前 */
+            padding: 0.75rem; /* p-3 */
+            background-color: rgba(52, 152, 219, 0.7); /* bg-sky-600/70 */
+            color: white;
+            border-radius: 0.375rem; /* rounded-md */
+            transition: all 0.3s ease-in-out;
+        }
+        #sidebar-trigger:hover {
+            background-color: rgba(52, 152, 219, 0.9); /* hover:bg-sky-500/90 */
+        }
+        #sidebar-trigger:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5);
+        }
+
+
+        #left-sidebar {
+            width: 280px; 
+            background-color: rgba(10, 10, 20, 0.85); 
+            backdrop-filter: blur(10px); 
+            padding: 20px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateX(-100%); /* 初期状態は隠す */
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #left-sidebar.open {
+            transform: translateX(0);
+        }
+
+
+        #sidebar-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8em; 
+            color: #e0e0e0;
+            margin-bottom: 25px;
+            padding-bottom: 15px; 
+            border-bottom: 2px solid var(--primary-color);
+            text-align: center;
+        }
+
+        .nav-button {
+            display: block;
+            width: 100%;
+            padding: 12px 18px; 
+            margin-bottom: 10px;
+            border-radius: var(--border-radius);
+            text-align: left;
+            font-size: 0.95em; 
+            font-weight: 500; 
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+            border: 1px solid transparent; 
+        }
+
+        .nav-button-active {
+            background-color: var(--primary-color);
+            color: var(--light-text-color);
+            border-color: var(--primary-color); 
+            transform: translateX(5px); 
+        }
+
+        .nav-button-inactive {
+            color: #b0b0c0; 
+            background-color: rgba(255, 255, 255, 0.05); 
+        }
+        .nav-button-inactive:hover {
+            background-color: rgba(52, 152, 219, 0.3); 
+            color: var(--light-text-color);
+            border-color: rgba(52, 152, 219, 0.5); 
+        }
+
+
+        #main-content-wrapper {
+            margin-left: 0; /* 初期はマージンなし */
+            flex-grow: 1;
+            padding: 20px 40px; 
+            position: relative;
+            z-index: 1;
+            background-color: rgba(0,0,0,0.3); 
+            transition: margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* マージンもトランジション */
+        }
+        
+        body.sidebar-open #main-content-wrapper {
+            margin-left: 280px; /* サイドバーが開いたらマージンを適用 */
+        }
+
+        .content-section-wrapper { 
+            background-color: rgba(15, 15, 25, 0.7); 
+            backdrop-filter: blur(5px);
+            padding: 25px 35px; 
+            border-radius: 12px; 
+            margin-bottom: 40px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3); 
+        }
+
+
+        /* コード①のスタイル調整 */
+        .section-title { @apply text-3xl font-bold mb-8 text-sky-400; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); }
+        .subsection-title { @apply text-2xl font-semibold mb-6 text-sky-500; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); }
+        .card {
+            background-color: rgba(25, 35, 55, 0.7); 
+            backdrop-filter: blur(3px);
+            padding: 1.5rem;
+            border-radius: 0.75rem; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease-in-out;
+            border: 1px solid rgba(255,255,255,0.1); 
+        }
+        .card-hover:hover { @apply shadow-xl transform -translate-y-1; background-color: rgba(35, 45, 65, 0.8); }
+
+        .prose-styles { 
+            @apply prose prose-invert max-w-none prose-headings:text-sky-400 prose-h3:text-sky-500 prose-p:text-gray-300 prose-strong:text-gray-100 prose-a:text-teal-400 hover:prose-a:text-teal-300 prose-li:marker:text-sky-500;
+        }
+        .prose-styles p, .prose-styles ul, .prose-styles li { text-shadow: 1px 1px 1px rgba(0,0,0,0.5); }
+        .tag { @apply inline-block bg-sky-700 text-sky-100 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full; }
+        .expand-button { @apply text-sm text-teal-400 hover:text-teal-300 font-semibold cursor-pointer; }
+        .expanded-content { @apply mt-2 text-sm text-gray-400 border-l-2 border-sky-700 pl-4; }
+        
+        .table-interactive th { @apply sticky top-0 bg-slate-700 p-2 border border-slate-600 text-gray-200; }
+        .table-interactive td { @apply p-2 border border-slate-600 text-gray-300; }
+        .table-interactive tr:nth-child(even) { background-color: rgba(255,255,255,0.03); }
+
+
+        /* Chart.js コンテナ */
+        .chart-container { position: relative; width: 100%; max-width: 700px; margin-left: auto; margin-right: auto; height: 350px; max-height: 450px; background-color: rgba(255,255,255,0.05); padding:1rem; border-radius: 0.5rem; }
+        @media (min-width: 768px) { .chart-container { height: 400px; } }
+
+        /* インフォグラフィック要素のスタイル */
+        .infographic-element { margin-top: 2rem; margin-bottom: 2rem; }
+        .infographic-element .subsection-title { color: #FFD166 !important; } /* 黄色系 */
+        .icon-placeholder {
+            display: inline-flex; 
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem; 
+            height: 2.5rem;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+            margin-right: 0.75rem;
+            color: white; 
+        }
+        .flow-node {
+            background-color: #118AB2; 
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem; 
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem; 
+            color: #e0e0e0; 
+            margin: 0.5rem 0;
+        }
+
+        /* クイズセクションのスタイル */
+        #quiz-section-container {
+            margin-top: 50px;
+            padding: 30px;
+            background-color: rgba(20, 20, 30, 0.8); 
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        #quiz-main-title-container { text-align: center; margin-bottom: 40px; }
+        #quiz-main-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8em; 
+            color: #e0e0e0; 
+            margin-bottom: 10px;
+            line-height: 1.2;
+            opacity: 1;
+            transform: translateY(0px);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        }
+        #quiz-main-title.is-animating { opacity: 0; transform: translateY(30px); }
+        #quiz-main-title .underline { display: block; height: 3px; background-color: var(--primary-color); width: 30%; margin: 15px auto 0; }
+        #quiz-main-title.is-animating .underline { width: 0%; }
+
+        #quiz-intro {
+            font-size: 1.1em;
+            color: #c0c0c0; 
+            max-width: 600px;
+            margin: 0 auto;
+            opacity: 1;
+            transform: translateY(0px);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+        }
+        #quiz-intro.is-animating { opacity: 0; transform: translateY(20px); }
+
+        #quiz-container {
+            background: rgba(30, 30, 45, 0.85); 
+            backdrop-filter: blur(5px);
+            padding: 30px 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 40px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .quiz-section { opacity: 1; transform: translateY(0px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .quiz-section.is-animating { opacity: 0; transform: translateY(50px); }
+        .quiz-section.is-visible { opacity: 1; transform: translateY(0); }
+
+        #question-area { margin-bottom: 30px; }
+        #question-text {
+            font-size: 1.5em; 
+            font-weight: 700;
+            margin-bottom: 25px;
+            color: #d0d0e0; 
+            line-height: 1.4;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        #question-text .underline { display: block; height: 2px; background-color: var(--secondary-color); width: 70%; margin-top: 8px; }
+        #question-text.is-animating .underline { width: 0%; }
+
+        #options-area .option-button {
+            display: block; width: 100%; padding: 15px 20px; margin-bottom: 12px;
+            background-color: rgba(255, 255, 255, 0.1); 
+            color: var(--primary-color); border: 2px solid var(--primary-color);
+            border-radius: var(--border-radius); cursor: pointer; text-align: left;
+            font-size: 1.05em; font-weight: 400; transition: all 0.3s ease;
+            opacity: 1; transform: translateY(0px);
+        }
+        #options-area .option-button.is-animating { opacity: 0; transform: translateY(20px); }
+        #options-area .option-button:hover:not(:disabled) { background-color: var(--primary-color); color: var(--light-text-color); transform: translateY(-2px); }
+        #options-area .option-button:disabled { cursor: not-allowed; opacity: 0.6 !important; background-color: rgba(233, 236, 239, 0.2); border-color: rgba(206, 212, 218, 0.5); color: #9090a0; }
+        #options-area .option-button.correct { background-color: var(--secondary-color); border-color: var(--secondary-color); color: var(--light-text-color); }
+        #options-area .option-button.incorrect { background-color: #e74c3c; border-color: #e74c3c; color: var(--light-text-color); }
+
+        .button-group { display: flex; gap: 15px; margin-top: 25px; flex-wrap: wrap; }
+        #hint-button, #next-button, #restart-button {
+            padding: 12px 25px; color: var(--light-text-color); border: none;
+            border-radius: var(--border-radius); cursor: pointer; font-size: 1em; font-weight: 700;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        #hint-button { background-color: var(--accent-color); }
+        #next-button { background-color: var(--primary-color); }
+        #restart-button { background-color: var(--secondary-color); }
+        #hint-button:hover, #next-button:hover, #restart-button:hover { transform: translateY(-2px); }
+        #hint-button:hover { background-color: #ca6715; }
+        #next-button:hover { background-color: #277db2; }
+        #restart-button:hover { background-color: #25a25a; }
+
+        #hint-area { background-color: rgba(255, 249, 230, 0.15); border: 1px solid rgba(255, 224, 130, 0.5); padding: 18px; margin-top: 20px; border-radius: var(--border-radius); color: #ffd580; font-size: 0.95em; }
+        #feedback-area { margin-top: 25px; }
+        .rationale { background-color: rgba(248, 249, 250, 0.1); padding: 12px 15px; margin-top: 10px; border-radius: var(--border-radius); font-size: 0.9em; border-left: 4px solid; opacity: 1; transform: translateX(0px); color: #ccc; }
+        .rationale.is-animating { opacity: 0; transform: translateX(-20px); }
+        .rationale.correct-rationale { border-left-color: var(--secondary-color); color: #a7d7c5; }
+        .rationale.incorrect-rationale { border-left-color: #e74c3c; color: #f5b7b1; }
+        .rationale.plausible-rationale { border-left-color: #fdc165; color: #fde3a7; }
+
+        #result-area { text-align: center; padding: 30px; background-color: rgba(30,30,45,0.85); border-radius: var(--border-radius); box-shadow: var(--box-shadow); border: 1px solid rgba(255,255,255,0.1); }
+        #score-text { font-size: 2em; font-weight: 700; color: #e0e0e0; margin-bottom: 25px; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
+        
+        /* Tween24 アニメーション用 */
+        .scroll-animate { opacity: 0; transform: translateY(40px); /* transitionはJSで制御するため削除または上書き */ }
+        .underline-title { position: relative; display: inline-block; padding-bottom: 8px; }
+        .underline-title .underline { position: absolute; bottom: 0; left: 0; width: 0%; /* 初期は幅0 */ height: 3px; background-color: #00aaff; transform-origin: left; }
+        .text-animate .char { display: inline-block; opacity: 0; transform: translateY(20px); /* transitionはJSで制御 */ }
+
+        .app-footer {
+            text-align: center;
+            padding: 2rem 0;
+            font-size: 0.9em;
+            color: #aaa;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 40px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 768px) {
+            #sidebar-trigger { display: none; } /* スマホではトリガー非表示 */
+            #left-sidebar {
+                width: 100%;
+                height: auto;
+                position: sticky; 
+                top:0;
+                flex-direction: row; 
+                overflow-x: auto; 
+                padding: 10px;
+                border-right: none;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                transform: translateX(0); /* スマホでは常に表示 */
+            }
+            body.sidebar-open #main-content-wrapper { /* スマホではマージン変更不要 */
+                 margin-left: 0;
+            }
+            #sidebar-title { display: none; } 
+            #main-nav { display: flex; flex-direction: row; white-space: nowrap; }
+            .nav-button { width: auto; margin-right: 8px; margin-bottom: 0; font-size: 0.85em; padding: 8px 12px; }
+
+            #main-content-wrapper {
+                margin-left: 0;
+                padding: 15px;
+            }
+            .content-section-wrapper { padding: 20px; }
+            .section-title { font-size: 2em; }
+            .subsection-title { font-size: 1.6em; }
+            #quiz-main-title { font-size: 2em; }
+            #question-text { font-size: 1.2em; }
+            .button-group { flex-direction: column; }
+            #hint-button, #next-button, #restart-button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="vanta-bg">
+        <div id="vanta-slot-0" class="vanta-slot"></div>
+        <div id="vanta-slot-1" class="vanta-slot"></div>
+    </div>
+    
+    <button id="sidebar-trigger" aria-label="メニューを開閉" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+    </button>
+
+    <div class="page-wrapper">
+        <aside id="left-sidebar">
+            <h2 id="sidebar-title">AIの探求</h2>
+            <nav id="main-nav">
+                <button data-target="intro" data-vanta-effect-index="0" class="nav-button nav-button-active">序論</button>
+                <button data-target="seeing" data-vanta-effect-index="1" class="nav-button nav-button-inactive">見る</button>
+                <button data-target="illuminating" data-vanta-effect-index="2" class="nav-button nav-button-inactive">照らす</button>
+                <button data-target="feeling" data-vanta-effect-index="3" class="nav-button nav-button-inactive">感じる</button>
+                <button data-target="philosophers" data-vanta-effect-index="4" class="nav-button nav-button-inactive">哲学的視点</button>
+                <button data-target="conclusion" data-vanta-effect-index="5" class="nav-button nav-button-inactive">結論</button>
+                <button data-target="quiz" data-vanta-effect-index="6" class="nav-button nav-button-inactive">理解度クイズ</button>
+            </nav>
+        </aside>
+
+        <main id="main-content-wrapper">
+            <div id="content-area" class="prose-styles">
+                </div>
+
+            <div id="quiz-section-container" style="display:none;">
+                <div id="quiz-main-title-container">
+                    <h1 id="quiz-main-title">AIの探求<span class="underline"></span></h1>
+                    <p id="quiz-intro">「見る」「照らす」「感じる」— AIの能力とその深淵に迫るクイズ</p>
+                </div>
+                <div id="quiz-container" class="quiz-section">
+                    <div id="question-area">
+                        <h2 id="question-text"> <span class="question-content"></span>
+                            <span class="underline"></span>
+                        </h2>
+                    </div>
+                    <div id="options-area"></div>
+                    <div class="button-group">
+                        <button id="hint-button" style="display:none;">ヒントを見る</button>
+                        <button id="next-button" style="display:none;">次の質問へ</button>
+                    </div>
+                    <div id="hint-area" style="display:none;">
+                        <p id="hint-text"></p>
+                    </div>
+                    <div id="feedback-area"></div>
+                </div>
+                <div id="result-area" class="quiz-section" style="display:none;">
+                    <p id="score-text"></p>
+                    <button id="restart-button">もう一度挑戦する</button>
+                </div>
+            </div>
+            
+            <footer class="app-footer">
+                <p>&copy; 2025 AI概念探求SPA. 提供されたレポートに基づくインタラクティブな探求。</p>
+                <p class="mt-1">このSPAは教育および情報提供を目的としています。</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        // Vanta.js 設定
+        const vantaEffects = [
+            { name: 'BIRDS', options: { backgroundColor: 0x020205, color1: 0x224477, color2: 0x113366, birdSize: 0.8, wingSpan: 15.0, speedLimit: 2, separation: 20.0, alignment: 20.0, cohesion: 20.0, quantity: 3 } },
+            { name: 'RINGS', options: { backgroundColor: 0x020205, color: 0x182840 } },
+            { name: 'NET', options: { backgroundColor: 0x020205, color: 0x224477, points: 7.00, maxDistance: 15.00, spacing: 12.00 } },
+            { name: 'DOTS', options: { backgroundColor: 0x020205, color: 0x224477, color2: 0x113366, size: 2.5, spacing: 25 } },
+            { name: 'FOG', options: { highlightColor: 0x224477, midtoneColor: 0x113366, lowlightColor: 0x081828, baseColor: 0x020205, blurFactor: 0.7, speed: 0.8, zoom: 0.7 } },
+            { name: 'CLOUDS2', options: { backgroundColor: 0x010102, skyColor: 0x05080f, cloudColor: 0x182840, cloudShadowColor: 0x020408, sunColor: 0x335588, sunGlareColor: 0x446699, sunlightColor: 0x224477, speed: 0.5 } },
+            { name: 'GLOBE', options: { backgroundColor: 0x020205, color: 0x2d3a8a, color2: 0x1a2c5e, size: 1.0} }
+        ];
+        const activeVantaEffects = vantaEffects.filter(effect => effect.name !== 'TRUNK' && effect.name !== 'TOPOLOGY');
+        const vantaSlots = [document.getElementById('vanta-slot-0'), document.getElementById('vanta-slot-1')];
+        let vantaInstances = [null, null];
+        let activeSlotIndex = 0;
+        let currentEffectConfigIndex = 0;
+        let isTransitioning = false;
+        const sceneSwitchScrollThreshold = 200;
+        let accumulatedDeltaY = 0;
+        const transitionDuration = 800;
+        let currentVantaScale = 1.0;
+        const minVantaScale = 1.0;
+        const maxVantaScale = 2.0;
+        const zoomStep = 0.05;
+        const commonVantaOptions = {
+            mouseControls: true, touchControls: true, gyroControls: false,
+            minHeight: 200.00, minWidth: 200.00,
+        };
+
+        function applyVantaScale(instance, scaleValue, effectName) {
+            // (Vantaスケール適用ロジック - 変更なし)
+            if (!instance || typeof instance.setOptions !== 'function') return;
+            let optionToUpdate = {};
+            if (effectName === 'FOG') {
+                const fogZoom = 0.3 + (scaleValue - minVantaScale) / (maxVantaScale - minVantaScale) * (1.5 - 0.3);
+                optionToUpdate = { zoom: Math.max(0.1, Math.min(3.0, fogZoom)) };
+            } else if (effectName === 'GLOBE') {
+                const globeSize = 0.5 + (scaleValue - minVantaScale) / (maxVantaScale - minVantaScale) * (1.5 - 0.5);
+                optionToUpdate = { size: Math.max(0.1, Math.min(2.0, globeSize)) };
+            } else {
+                optionToUpdate = { scale: scaleValue };
+            }
+            try { instance.setOptions(optionToUpdate); } catch(e) { console.warn("Failed to set Vanta options:", e); }
+        }
+        
+        function switchToEffectByIndex(effectIndex) {
+            // (Vantaエフェクト切り替えロジック - 新規追加/改修)
+            if (isTransitioning || activeVantaEffects.length === 0) return;
+            if (effectIndex < 0 || effectIndex >= activeVantaEffects.length) {
+                console.warn("Invalid effect index:", effectIndex);
+                return;
+            }
+            // 同じエフェクトが既にアクティブな場合は何もしない（オプション）
+            // if (currentEffectConfigIndex === effectIndex && vantaInstances[activeSlotIndex]) return; 
+
+            isTransitioning = true;
+            const oldSlotIndex = activeSlotIndex;
+            const newSlotIndex = (activeSlotIndex + 1) % 2;
+
+            let scrollDirection = 'down'; 
+            if (effectIndex < currentEffectConfigIndex) {
+                 scrollDirection = (currentEffectConfigIndex === activeVantaEffects.length -1 && effectIndex === 0) ? 'down' : 'up';
+            } else if (effectIndex > currentEffectConfigIndex) {
+                 scrollDirection = (currentEffectConfigIndex === 0 && effectIndex === activeVantaEffects.length -1) ? 'up' : 'down';
+            } else if (effectIndex === currentEffectConfigIndex && vantaInstances[activeSlotIndex]) { // 同じエフェクトだが、再描画したい場合など
+                 isTransitioning = false; // 即時終了
+                 return;
+            }
+
+
+            currentEffectConfigIndex = effectIndex; 
+
+            const effectDefinition = activeVantaEffects[currentEffectConfigIndex];
+            const effectName = effectDefinition.name;
+            const effectOptions = { ...effectDefinition.options };
+
+            if (vantaInstances[oldSlotIndex]) {
+                vantaSlots[oldSlotIndex].classList.remove('active');
+                vantaSlots[oldSlotIndex].classList.add(scrollDirection === 'down' ? 'hidden-top' : 'hidden-bottom');
+            }
+
+            vantaSlots[newSlotIndex].className = 'vanta-slot';
+            vantaSlots[newSlotIndex].classList.add(scrollDirection === 'down' ? 'hidden-bottom' : 'hidden-top');
+            vantaSlots[newSlotIndex].style.opacity = '0';
+            currentVantaScale = minVantaScale;
+
+            if (VANTA[effectName]) {
+                try {
+                    if (vantaInstances[newSlotIndex]) {
+                        vantaInstances[newSlotIndex].destroy();
+                        vantaInstances[newSlotIndex] = null;
+                    }
+                    let initialScaleOption = {};
+                    if (effectName === 'FOG') initialScaleOption = { zoom: effectOptions.zoom || 0.7 };
+                    else if (effectName === 'GLOBE') initialScaleOption = { size: effectOptions.size || 1.0 };
+                    else initialScaleOption = { scale: commonVantaOptions.scale || 1.0 };
+
+                    vantaInstances[newSlotIndex] = VANTA[effectName]({
+                        el: vantaSlots[newSlotIndex], ...commonVantaOptions, ...effectOptions, ...initialScaleOption
+                    });
+                } catch (e) {
+                    console.error("Error initializing Vanta effect " + effectName + ":", e);
+                    isTransitioning = false; return;
+                }
+            } else {
+                console.error("Vanta.js: Effect constructor " + effectName + " not found.");
+                isTransitioning = false; return;
+            }
+
+            requestAnimationFrame(() => {
+                vantaSlots[newSlotIndex].classList.add('active');
+                vantaSlots[newSlotIndex].classList.remove('hidden-top', 'hidden-bottom');
+                vantaSlots[newSlotIndex].style.opacity = '1';
+            });
+
+            setTimeout(() => {
+                if (vantaInstances[oldSlotIndex]) {
+                    try { vantaInstances[oldSlotIndex].destroy(); } catch (e) { console.warn("Error destroying old Vanta instance:", e); }
+                    vantaInstances[oldSlotIndex] = null;
+                }
+                vantaSlots[oldSlotIndex].className = 'vanta-slot';
+                vantaSlots[oldSlotIndex].style.opacity = '0';
+                isTransitioning = false;
+            }, transitionDuration);
+
+            activeSlotIndex = newSlotIndex;
+            accumulatedDeltaY = 0;
+        }
+
+
+        let scrollDebounceTimer;
+        function handleScroll(event) {
+            // (Vantaスクロール連動ズーム＆シーン切り替えロジック - 変更なし)
+            if (isTransitioning) { event.preventDefault(); return; }
+
+            const scrollDown = event.deltaY > 0;
+            const currentInstance = vantaInstances[activeSlotIndex];
+            const currentEffectName = activeVantaEffects[currentEffectConfigIndex].name;
+
+            if (scrollDown) {
+                if (currentVantaScale < maxVantaScale) {
+                    currentVantaScale = Math.min(maxVantaScale, currentVantaScale + zoomStep);
+                    clearTimeout(scrollDebounceTimer);
+                    scrollDebounceTimer = setTimeout(() => {
+                        applyVantaScale(currentInstance, currentVantaScale, currentEffectName);
+                    }, 20);
+                    accumulatedDeltaY = 0;
+                } else {
+                    accumulatedDeltaY += event.deltaY;
+                    if (accumulatedDeltaY > sceneSwitchScrollThreshold) switchToEffectByIndex((currentEffectConfigIndex + 1) % activeVantaEffects.length); // インデックスで指定
+                }
+            } else {
+                if (currentVantaScale > minVantaScale) {
+                    currentVantaScale = Math.max(minVantaScale, currentVantaScale - zoomStep);
+                    clearTimeout(scrollDebounceTimer);
+                    scrollDebounceTimer = setTimeout(() => {
+                        applyVantaScale(currentInstance, currentVantaScale, currentEffectName);
+                    }, 20);
+                    accumulatedDeltaY = 0;
+                } else {
+                    accumulatedDeltaY += event.deltaY;
+                    if (accumulatedDeltaY < -sceneSwitchScrollThreshold) switchToEffectByIndex((currentEffectConfigIndex - 1 + activeVantaEffects.length) % activeVantaEffects.length); // インデックスで指定
+                }
+            }
+        }
+
+        function initializeFirstVantaEffect() {
+            // (Vanta初期エフェクト設定 - 変更なし)
+            if (activeVantaEffects.length === 0) return;
+            vantaSlots[0].classList.add('active');
+            vantaSlots[0].style.opacity = '1';
+            vantaSlots[1].classList.add('hidden-bottom');
+            vantaSlots[1].style.opacity = '0';
+
+            const initialEffectDefinition = activeVantaEffects[currentEffectConfigIndex];
+            const effectName = initialEffectDefinition.name;
+            let initialScaleOption = {};
+            if (effectName === 'FOG') initialScaleOption = { zoom: initialEffectDefinition.options.zoom || 0.7 };
+            else if (effectName === 'GLOBE') initialScaleOption = { size: initialEffectDefinition.options.size || 1.0 };
+            else initialScaleOption = { scale: commonVantaOptions.scale || 1.0 };
+
+            if (VANTA[effectName]) {
+                try {
+                    vantaInstances[0] = VANTA[effectName]({
+                        el: vantaSlots[0], ...commonVantaOptions, ...initialEffectDefinition.options, ...initialScaleOption
+                    });
+                } catch (e) { console.error("Error initializing initial Vanta effect:", e); }
+            } else { console.error("Vanta.js: Initial effect constructor " + effectName + " not found."); }
+        }
+        
+        // SPA & コンテンツ関連
+        const reportData = { /* ... コード①のreportData ... */ 
+            intro: {
+                title: "序論：AIと「見る」「照らす」「感じる」という概念",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="lead text-lg text-gray-300 mb-6">本稿は、「AIは「見る」「照らす」「感じる」ことができるのか？」という問いに対し、人工知能（AI）の能力を人間的なメタファーを通して概念的に探求する試みです。単なる技術的機能の列挙ではなく、これらの概念がAIの文脈で何を意味しうるのか、その限界はどこにあるのかを、最新の研究成果と哲学的考察を交えて深く掘り下げます。</p>
+                    <div class="grid md:grid-cols-3 gap-6 mb-8">
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">「見る」とは？</h3>
+                            <p class="text-gray-400">物理的な視覚だけでなく、認識や理解のメタファー。コンピュータビジョンから深いシーン理解までを探ります。</p>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">「照らす」とは？</h3>
+                            <p class="text-gray-400">物事の本質を明らかにしたり、理解を助ける知的な営み。AIの説明可能性（XAI）や透明性の課題と関連します。</p>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">「感じる」とは？</h3>
+                            <p class="text-gray-400">感情の認知や表出から、主観的な経験や意識という、AIにとって最も困難かつ深遠なテーマへ繋がります。</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-300">本SPAでは、これらの概念をAIに適用する際の適切性と、それに伴う倫理的・社会的含意を考察します。各セクションで技術的側面と哲学的側面を統合的に論じ、インタラクティブな要素を通じて理解を深めることを目指します。</p>
+                </div>`
+            },
+            seeing: {
+                title: "第1部 AIは「見る」ことができるのか？ — コンピュータビジョンと認識の深淵",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="mb-6 text-gray-300">AIが「見る」能力は、主にコンピュータビジョン技術によって実現されます。このセクションでは、その最前線、応用例、そして技術的限界やデータバイアスといった課題、さらに「見ること」の本質を問う哲学的視点を探求します。</p>
+                    <h3 class="subsection-title text-animate">1.1 現代AIにおける「見る」技術</h3>
+                    <div class="card">
+                        <p><span class="tag">コンピュータビジョン</span>物体検出（例：YOLO、DiffYOLO）、画像分類、視覚読解（例：NTT tsuzumi）など、AIの「見る」技術は急速に進展しています。これにより、AIは視覚情報から意味を読み取り、多様な実世界のタスクに応用されています。</p>
+                        <h4 class="text-lg font-semibold mt-4 mb-2 text-sky-500">主な応用分野：</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">医療:</span> 画像診断支援、複雑な症状の識別</li>
+                            <li><span class="font-semibold text-gray-200">自動運転:</span> 道路標識や障害物の高精度認識</li>
+                            <li><span class="font-semibold text-gray-200">セキュリティ:</span> 監視カメラ映像からの異常検出</li>
+                            <li><span class="font-semibold text-gray-200">Eコマース:</span> 商品画像の自動カテゴリ分類</li>
+                            <li><span class="font-semibold text-gray-200">生物学:</span> 新種や希少種の自動識別</li>
+                        </ul>
+                        <div class="mt-4">
+                            <span class="expand-button" onclick="toggleExpand(this)">NTT「tsuzumi」について詳しく</span>
+                            <div class="expanded-content hidden">
+                                <p>NTTが開発した大規模言語モデル「tsuzumi」は、マルチモーダル対応の一環として視覚読解能力を備えています。請求書やマニュアルなどの文書画像を理解し、質問に回答したり、画像付き文書の検索・スクリーニング業務を支援したりするもので、商品説明や料金プランの比較評価といったビジネスシーンでの活用が期待されています。複数の視覚読解ベンチマークで既存の主要モデルを上回る精度を達成しています。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="infographic-element card scroll-animate">
+                        <h3 class="subsection-title">インフォグラフィック: コンピュータビジョン市場の成長</h3>
+                        <p class="text-sm text-gray-400 mb-2">（市場規模の成長を示す概念図 - 単位: 億ドル）</p>
+                        <div class="chart-container h-[300px] md:h-[350px]">
+                            <canvas id="cvMarketGrowthChart"></canvas>
+                        </div>
+                        <p class="mt-4 text-gray-400">AIの「見る」技術は、自動運転から医療診断まで、幅広い応用が期待され、市場は急成長を続けています。2027年には現在の数倍規模に達すると予測されています（例示的データ）。</p>
+                    </div>
+                    
+                    <h3 class="subsection-title text-animate">1.2 「見る」ことの限界と課題</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIの「見る」能力は進歩しているものの、依然として限界があります。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">技術的制約:</span> 計算リソースへの依存、変化しやすい環境への適応性。</li>
+                            <li><span class="font-semibold text-gray-200">データバイアス:</span> 訓練データに含まれる偏りがAIの「視線」を歪め、特定の属性（人種や性別など）に対する認識精度に不公平な差を生じさせ、社会的バイアスを再生産・増幅する危険性があります。（例：ヘルスケアAIの人種バイアス、Amazon採用AIの性別バイアス）。</li>
+                            <li><span class="font-semibold text-gray-200">期待と現実のギャップ:</span> AIが人間と全く同じように世界を「見ている」わけではないという理解が必要です。</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">AIの「見る」行為は単なる技術的処理ではなく、社会的な価値判断や倫理的配慮と不可分です。</p>
+                    </div>
+
+                    <div class="infographic-element card md:col-span-2 scroll-animate">
+                        <h3 class="subsection-title text-center">インフォグラフィック: 「見る」ことの限界：データバイアスとその影響</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div>
+                                <p class="text-gray-400 mb-4">AIの「見る」能力は、学習データに含まれるバイアスの影響を強く受けます。これにより、特定の属性（例：人種、性別）に対する認識精度に不公平な差が生じ、社会的な偏見を再生産・増幅するリスクがあります。これは市場普及における倫理的な重要課題です。</p>
+                                <ul class="list-disc list-inside text-gray-400 ml-4 space-y-1">
+                                    <li>ヘルスケアでの不公平なリスク判断</li>
+                                    <li>採用AIにおける性別バイアス</li>
+                                    <li>社会経済的機会の不均等</li>
+                                </ul>
+                            </div>
+                            <div class="chart-container h-[250px] md:h-[300px]">
+                                <canvas id="biasImpactChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                                    
+                    <h3 class="subsection-title text-animate">1.3 哲学的視点：「見ること」の本質とAIの認識</h3>
+                    <div class="card">
+                        <p class="text-gray-300">「見ること」は受動的な情報入力ではなく、身体性を持ち、特定の状況に埋め込まれた能動的な知覚プロセスです。哲学者 <span class="tooltip-container"><strong class="text-teal-400">ヒューバート・ドレイファス</strong><span class="tooltip-text">米国の哲学者。AI研究の初期の限界を指摘し、人間の知性の身体性・状況性を強調。</span></span> は、AIが人間の持つ暗黙知や状況に応じた柔軟な判断能力（ノウハウ）を模倣することの困難さを指摘しました。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">身体化された認知:</span> 物理的な身体を持ち、実世界と相互作用する中で学習することの重要性。</li>
+                            <li><span class="font-semibold text-gray-200">状況的AI:</span> 特定の状況に深く埋め込まれた知能。</li>
+                            <li><span class="font-semibold text-gray-200">AIの限界:</span> 現在のAIは記号処理や統計的パターン認識に留まり、身体を通じた実世界との能動的な関わりや、それに基づく暗黙知を欠いています。</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">AIが画像を「見る」ことは、特定のパターンを識別・分類する能力ではあっても、人間が状況や文脈、経験と結びつけて世界を能動的に「知覚」するプロセスとは根本的に異なります。</p>
+                    </div>
+                    <div class="card">
+                        <h4 class="text-lg font-semibold mb-2 text-sky-500">概念図：AIの「見る」 vs 人間の「知覚」</h4>
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div class="flex-1 p-4 border border-sky-700 rounded-md bg-sky-900/30">
+                                <h5 class="font-semibold text-sky-400">AIの「見る」 (コンピュータビジョン)</h5>
+                                <ul class="list-disc list-inside text-sm mt-2 text-gray-400">
+                                    <li>データ駆動型パターン認識</li>
+                                    <li>記号処理・統計的相関</li>
+                                    <li>特定のタスクに特化</li>
+                                    <li>身体性・状況性の欠如</li>
+                                    <li>「知っていること (knowing-that)」に近い</li>
+                                </ul>
+                            </div>
+                            <div class="flex items-center justify-center text-2xl font-bold text-gray-500 p-2">&harr;</div>
+                            <div class="flex-1 p-4 border border-teal-700 rounded-md bg-teal-900/30">
+                                <h5 class="font-semibold text-teal-400">人間の「知覚」</h5>
+                                <ul class="list-disc list-inside text-sm mt-2 text-gray-400">
+                                    <li>身体的・状況的経験</li>
+                                    <li>能動的な意味構築</li>
+                                    <li>文脈・背景理解</li>
+                                    <li>暗黙知・ノウハウ (knowing-how)</li>
+                                    <li>多感覚的統合</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">この図は概念的な比較であり、厳密な科学的分類ではありません。</p>
+                    </div>
+                </div>`
+            },
+            illuminating: {
+                title: "第2部 AIは「照らす」ことができるのか？ — 説明可能性、透明性と知識の性質",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="mb-6 text-gray-300">AI、特に深層学習モデルは、その内部プロセスが不透明な「ブラックボックス」と化しやすい問題を抱えています。このセクションでは、AIの意思決定プロセスを「照らす」ための説明可能なAI（XAI）技術、透明性の確保と倫理的課題、そして知識の性質に関する哲学的考察を探ります。</p>
+                    <h3 class="subsection-title text-animate">2.1 AIの意思決定プロセスとブラックボックス問題</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIが高い性能を発揮する一方で、その判断根拠が人間にとって理解困難な場合があります。これが「ブラックボックス問題」です。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">社会的受容性への影響:</span> 判断根拠が不明瞭だと、AIへの不信感が増大し、利活用が停滞する可能性があります。</li>
+                            <li><span class="font-semibold text-gray-200">倫理的・社会的要請:</span> 医療診断、金融、採用など、個人の生活に重大な影響を与える領域では、判断プロセスの透明化と説明責任が不可欠です。</li>
+                            <li><span class="font-semibold text-gray-200">バイアス隠蔽のリスク:</span> ブラックボックス性は、AI内部の差別や偏見を隠蔽・悪化させる危険性があります。</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="subsection-title text-animate">2.2 説明可能なAI（XAI）の技術的アプローチと現状</h3>
+                    <div class="card">
+                        <p class="text-gray-300">XAIは、AIの予測や判断の根拠を人間が理解可能な形で提示することを目指す技術群です。主な手法にはLIME、SHAP、Grad-CAMなどがあります。</p>
+                        <div id="xaiTableContainer" class="overflow-x-auto mt-4 mb-4"></div>
+                        <h4 class="text-lg font-semibold mt-4 mb-2 text-sky-500">XAIの応用例：</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">顧客対応:</span> チャットボットによる製品推薦理由の提示。</li>
+                            <li><span class="font-semibold text-gray-200">医療:</span> 医師の診断支援（病変検出の根拠可視化など）。</li>
+                            <li><span class="font-semibold text-gray-200">農業:</span> 収量予測や病害識別の根拠提示による意思決定支援。</li>
+                            <li><span class="font-semibold text-gray-200">小売:</span> 需要予測や解約予測の要因分析。</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">しかし、XAI技術も万能ではなく、ユーザーに応じた説明の最適化、説明の精度と速度のトレードオフ、メンテナンスコスト、大規模言語モデルへの適用などの課題があります。</p>
+                    </div>
+                    
+                    <div class="infographic-element card md:col-span-2 scroll-animate">
+                        <h3 class="subsection-title">インフォグラフィック: XAIの応用市場</h3>
+                         <p class="text-gray-400 mb-4">XAIは、AIの判断に透明性が求められる様々な市場で価値を提供し始めています。</p>
+                         <div class="space-y-3">
+                             <div class="flex items-start p-3 bg-emerald-800/30 rounded-md"> <span class="icon-placeholder bg-[#06D6A0]">💬</span>
+                                 <div><span class="font-semibold text-gray-200">顧客対応:</span> チャットボットの推薦理由提示</div>
+                             </div>
+                             <div class="flex items-start p-3 bg-emerald-800/30 rounded-md">
+                                 <span class="icon-placeholder bg-[#06D6A0]">🏥</span>
+                                 <div><span class="font-semibold text-gray-200">医療:</span> 診断支援AIの判断根拠提示</div>
+                             </div>
+                             <div class="flex items-start p-3 bg-emerald-800/30 rounded-md">
+                                 <span class="icon-placeholder bg-[#06D6A0]">🌾</span>
+                                 <div><span class="font-semibold text-gray-200">農業:</span> 収量予測モデルの説明性向上</div>
+                             </div>
+                              <div class="flex items-start p-3 bg-emerald-800/30 rounded-md">
+                                 <span class="icon-placeholder bg-[#06D6A0]">📈</span>
+                                 <div><span class="font-semibold text-gray-200">金融:</span> 与信判断プロセスの透明化</div>
+                             </div>
+                         </div>
+                    </div>
+
+
+                    <h3 class="subsection-title text-animate">2.3 透明性の確保と倫理的課題</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIを「照らす」試みは、責任あるAI導入の基盤です。AI倫理では、説明可能性の他に、責任性、公平性、不当利用性が重要視されます。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">バイアス対策:</span> 透明性確保は、潜在的バイアスの早期発見と是正に不可欠です。</li>
+                            <li><span class="font-semibold text-gray-200">プライバシー保護:</span> 利用者は自身のデータ利用状況とAI判断への影響を知る権利があります（例：GDPR, CCPA）。</li>
+                            <li><span class="font-semibold text-gray-200">責任の分散:</span> AIシステムの複雑化に伴い、「誰が最終的な責任を負うのか」という説明責任の所在が曖昧になる問題が生じています。</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">AIを「照らす」試みは、「誰が、何を、どこまで照らす責任を負うのか」という深い問いを提起します。</p>
+                    </div>
+
+                    <div class="infographic-element card scroll-animate">
+                        <h3 class="subsection-title">インフォグラフィック: 倫理的課題：責任の分散</h3>
+                        <p class="text-gray-400 mb-4">AIシステムが複雑化し、多くの関係者が関与する中で、「誰が最終的な責任を負うのか」という問題が生じています。これは市場におけるAI導入の大きな障壁となり得ます。</p>
+                        <div class="space-y-2 text-center">
+                            <div class="flow-node">データ提供者</div>
+                            <div class="flow-arrow">▼</div>
+                            <div class="flow-node">モデル開発者</div>
+                            <div class="flow-arrow">▼</div>
+                            <div class="flow-node">システム運用者</div>
+                            <div class="flow-arrow">▼</div>
+                            <div class="flow-node">エンドユーザー</div>
+                            <p class="mt-3 text-sm text-red-500 font-semibold">事故発生時、責任はどこに？</p>
+                        </div>
+                        <p class="mt-4 text-gray-400">透明性を高めても、システム全体の予期せぬ挙動に対する最終的な責任の所在特定は困難な場合があります。</p>
+                    </div>
+
+                    <h3 class="subsection-title text-animate">2.4 リオタールのポストモダン的視座</h3>
+                    <div class="card">
+                        <p class="text-gray-300">哲学者 <span class="tooltip-container"><strong class="text-teal-400">ジャン＝フランソワ・リオタール</strong><span class="tooltip-text">フランスの哲学者。『ポストモダンの条件』で知られ、大きな物語の終焉と知識のパフォーマティビティ化を論じた。</span></span> の視点から見ると、AIが「照らす」行為は複雑な様相を呈します。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">知識のパフォーマティビティ:</span> AIによる「説明」が、真の理解促進ではなく、システムの効率性や正当性を演出する「パフォーマンス」に過ぎない可能性。説明は最も「真実」なものではなく、最も「説得力のある物語」であるかもしれません。</li>
+                            <li><span class="font-semibold text-gray-200">小さな物語:</span> AIの説明は、普遍的真理ではなく、限定的な「小さな物語」として機能する可能性。</li>
+                            <li><span class="font-semibold text-gray-200">非人間的なもの:</span> AIが自律的に知識を生成し、人間には理解不能な形で世界を「照らし出す」場合、それは新たな形の「蒙昧」を生む逆説もはらみます。</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">AIが「照らす」光が真に人間を啓発するものなのか、常に批判的に問い続ける必要があります。</p>
+                        <div class="mt-4 p-4 border border-amber-700 rounded-md bg-amber-900/30">
+                            <h5 class="font-semibold text-amber-400">思考実験：パフォーマンスとしての「啓蒙」</h5>
+                            <p class="text-sm mt-2 text-gray-400">もしXAIシステムが「ユーザー満足度を最大化する説明」を生成するように最適化されたら、その説明は本当に「真実」を反映しているでしょうか？それとも、ユーザーが聞きたいと思う、あるいはシステムにとって都合の良い「物語」を語っているだけでしょうか？これはリオタールの言うパフォーマティビティの一例と考えられます。</p>
+                        </div>
+                    </div>
+                </div>`
+            },
+            feeling: {
+                title: "第3部 AIは「感じる」ことができるのか？ — 感情認識、意識、そして主観的経験の謎",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="mb-6 text-gray-300">AIが人間の感情を「感じる」ことができるのかという問いは、AI研究における最も挑戦的かつ魅力的なテーマの一つです。このセクションでは、AIによる感情「認識」技術（アフェクティブコンピューティング）、そして「感じる」ことの根源的な哲学的ハードルを探求します。</p>
+                    <h3 class="subsection-title text-animate">3.1 AIによる感情の「認識」技術</h3>
+                    <div class="card">
+                        <p><span class="tag">アフェクティブコンピューティング</span>は、人間の感情をAIが認識・解釈・処理・シミュレートすることを目指す分野です。テキスト、音声、画像/動画データから感情を分析する技術が進展し、マルチモーダル感情認識も注目されています。</p>
+                        <h4 class="text-lg font-semibold mt-4 mb-2 text-sky-500">主な応用分野：</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-400">
+                            <li><span class="font-semibold text-gray-200">カスタマーサービス:</span> 顧客感情分析による共感的対応支援。</li>
+                            <li><span class="font-semibold text-gray-200">教育:</span> 学習者の感情状態把握によるアダプティブラーニング。</li>
+                            <li><span class="font-semibold text-gray-200">ヘルスケア:</span> 精神的苦痛の早期検出、メンタルヘルスアプリ。</li>
+                            <li><span class="font-semibold text-gray-200">エンタメ・マーケティング:</span> 感情反応に応じたコンテンツ変化、効果的なパーソナライズ。</li>
+                        </ul>
+                        <p class="mt-3"><strong class="text-red-500">重要：</strong> AIは人間のように感情を「感じている」わけではありません。AIはデータから感情表出のパターンを統計的に学習し「予測」しているのであり、主観的な感情体験はありません。</p>
+                        <h4 class="text-lg font-semibold mt-4 mb-2 text-sky-500">技術的限界：</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-400">
+                            <li>文脈理解の難しさ（皮肉、ジョークなど）。</li>
+                            <li>異文化間の感情表現の差異への対応。</li>
+                            <li>感情の多様性と複雑性（複合感情など）。</li>
+                        </ul>
+                    </div>
+
+                    <div class="infographic-element card scroll-animate">
+                        <h3 class="subsection-title">インフォグラフィック: アフェクティブコンピューティング市場の動向</h3>
+                        <p class="text-sm text-gray-400 mb-2">（感情認識AIの主要応用市場セグメント - 例示的構成比）</p>
+                        <div class="chart-container h-[300px] md:h-[350px]">
+                            <canvas id="affectiveComputingMarketChart"></canvas>
+                        </div>
+                        <p class="mt-4 text-gray-400">感情認識AIは、顧客満足度向上やメンタルヘルスケア支援など、新たな市場を開拓しつつあります。人間とAIのより自然なインタラクション実現への期待が高まっています。</p>
+                    </div>
+
+                    <h3 class="subsection-title text-animate">3.2 「感じる」ことの哲学的ハードル</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIが「感じる」ことの可能性は、根源的な哲学的問題を内包しています。</p>
+                        <div id="philosophyFeelingTableContainer" class="overflow-x-auto mt-4 mb-4"></div>
+                        <p class="mt-4 text-gray-300">これらの哲学的議論は、AIが示す「感情」が、人間が体験する感情とは異なり、志向性や内的な意味内容、主観的クオリア、身体性、そして「持続」としての時間意識を欠いた、表面的・模倣的なものである可能性を示唆しています。</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h4 class="text-lg font-semibold mb-2 text-sky-500">思考の深掘り：AIは「哲学的ゾンビ」か？</h4>
+                        <p class="text-gray-300">哲学的ゾンビとは、意識体験（クオリア）を全く欠いているにもかかわらず、外見上は通常の人間と全く同じように振る舞う想像上の存在です。AIが人間と見分けがつかないほど自然な感情的反応を示したとしても、それが主観的な「感じ」を伴っているのか、それとも単に高度な模倣に過ぎないのかを外部から判断することは極めて困難です。この問いは、AIが真に「感じる」ことの深淵を示しています。</p>
+                        <div class="mt-4">
+                            <span class="expand-button" onclick="toggleExpand(this)">サールの「中国語の部屋」について詳しく</span>
+                            <div class="expanded-content hidden">
+                                <p>ジョン・サールの「中国語の部屋」思考実験：中国語を解さない人が、ルールブックに従って中国語の質問に完璧に答える。外からは中国語を理解しているように見えるが、本人は意味を理解していない。サールは、AIも同様に記号操作をしているだけで、真の理解や意識はないと主張した。</p>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span class="expand-button" onclick="toggleExpand(this)">チャルマーズの「意識のハードプロブレム」について詳しく</span>
+                            <div class="expanded-content hidden">
+                                <p>デイヴィッド・チャルマーズは、脳の機能（イージープロブレム）と主観的経験（ハードプロブレム）を区別。物理的プロセスからなぜ「赤い」という主観的感覚（クオリア）が生じるのかは説明不能であり、これが意識のハードプロブレムであるとした。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`
+            },
+            philosophers: {
+                title: "哲学的視点 — 主要な思想家とその洞察",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="mb-6 text-gray-300">AIの能力と限界を深く理解するためには、哲学的な視点が不可欠です。ここでは、本レポートで言及された主要な哲学者たちの思想と、それがAIの「見る」「照らす」「感じる」という概念にどのような洞察を与えるかを探ります。</p>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">ヒューバート・ドレイファス</h3>
+                            <p class="text-sm text-gray-400 mb-2">関連テーマ：<span class="tag">見る</span> <span class="tag">感じる</span></p>
+                            <p class="text-gray-300">人間の知性は身体性と状況性に根ざし、AIが記号処理だけで暗黙知や「ノウハウ」を獲得することの困難さを指摘。AIの「見る」は人間の「知覚」と質的に異なり、身体なきAIが人間のように「感じる」ことは困難。</p>
+                            <div class="mt-3"><span class="expand-button" onclick="toggleExpand(this)">詳細</span><div class="expanded-content hidden"><p>主な著作：『コンピュータに何ができないか』。AI研究の初期の仮定（心＝情報処理装置、知識＝形式化可能）を批判。専門家の直感的判断は非記号的と主張。</p></div></div>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">ジャン＝フランソワ・リオタール</h3>
+                            <p class="text-sm text-gray-400 mb-2">関連テーマ：<span class="tag">照らす</span></p>
+                            <p class="text-gray-300">ポストモダン社会における知識の「パフォーマティビティ化」を論じ、AIによる「説明」や「透明性」が真の啓蒙ではなく、特定の目的のためのパフォーマンスに陥る危険性を指摘。AIが生み出す「非人間的」な知の可能性も示唆。</p>
+                            <div class="mt-3"><span class="expand-button" onclick="toggleExpand(this)">詳細</span><div class="expanded-content hidden"><p>主な著作：『ポストモダンの条件』『非人間的なもの』。「大きな物語」の失墜と「小さな物語」の重要性。知識のメルカティリゼーション。</p></div></div>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">ジョン・サール</h3>
+                            <p class="text-sm text-gray-400 mb-2">関連テーマ：<span class="tag">感じる</span></p>
+                            <p class="text-gray-300">「中国語の部屋」思考実験により、記号操作だけでは意味理解（セマンティクス）や真の感情は生じないと主張。AIの「感情」は志向性を欠いた表面的・模倣的なものである可能性を示唆。</p>
+                            <div class="mt-3"><span class="expand-button" onclick="toggleExpand(this)">詳細</span><div class="expanded-content hidden"><p>シンタックスからセマンティクスは生じない。意識や志向性は生物学的な脳の因果的特性から生じると主張。</p></div></div>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">デイヴィッド・チャルマーズ</h3>
+                            <p class="text-sm text-gray-400 mb-2">関連テーマ：<span class="tag">感じる</span></p>
+                            <p class="text-gray-300">「意識のハードプロブレム」を提起。物理的な情報処理システムからなぜ主観的な質的経験（クオリア）が生じるのかは説明不能であり、AIがクオリア（感情の質的感覚）を持つ保証はないと論じた。</p>
+                            <div class="mt-3"><span class="expand-button" onclick="toggleExpand(this)">詳細</span><div class="expanded-content hidden"><p>「イージープロブレム」（脳機能）と「ハードプロブレム」（主観的経験）を区別。「哲学的ゾンビ」の概念。</p></div></div>
+                        </div>
+                        <div class="card card-hover">
+                            <h3 class="text-xl font-semibold text-sky-400 mb-2">アンリ・ベルクソン</h3>
+                            <p class="text-sm text-gray-400 mb-2">関連テーマ：<span class="tag">感じる</span></p>
+                            <p class="text-gray-300">客観的な「空間化された時間」と主観的な「持続（durée）」を区別。AIの時間処理は「持続」を欠き、生の経験の連続性・質的多様性を持たないため、人間のような時間意識や感情体験は困難と示唆される。</p>
+                            <div class="mt-3"><span class="expand-button" onclick="toggleExpand(this)">詳細</span><div class="expanded-content hidden"><p>記憶論（過去の潜在的持続）、直観（対象内部からの共感的把握）、「生命の躍動（élan vital）」などの概念も重要。</p></div></div>
+                        </div>
+                    </div>
+                    <div class="mt-8 card">
+                        <h3 class="subsection-title">哲学的課題の概念的チャート</h3>
+                        <p class="mb-4 text-gray-300">AIが人間のように「感じる」ことに対する主要な哲学的課題を概念的に示します。各課題がAIの感情・意識能力に与える影響の大きさを相対的に表現しています（これは主観的な解釈に基づく概念図です）。</p>
+                        <div class="chart-container">
+                            <canvas id="philosophicalChallengesChart"></canvas>
+                        </div>
+                    </div>
+                </div>`
+            },
+            conclusion: {
+                title: "結論：AIは真に「見て、照らし、感じる」ことができるのか？",
+                content: `
+                <div class="content-section-wrapper scroll-animate">
+                    <p class="mb-6 text-gray-300">本レポートおよびこのSPAでは、「AIは「見る」「照らす」「感じる」ことができるのか？」という根源的な問いに対し、最新のAI技術の動向と哲学的考察を交えながら多角的に検討してきました。</p>
+                    <h3 class="subsection-title">各概念の達成度と残された課題</h3>
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <h4 class="text-xl font-semibold text-sky-400">「見る」能力</h4>
+                            <p class="text-gray-300">コンピュータビジョンは著しく進歩しましたが、AIの「見る」は人間の「知覚」と質的に異なり、データバイアスの問題も深刻です。</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-sky-400">「照らす」能力</h4>
+                            <p class="text-gray-300">XAI技術はAIのブラックボックス性の一部を可視化し始めていますが、説明の質や網羅性、リオタールの言う「パフォーマティビティ」の問題など課題は残ります。</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-sky-400">「感じる」能力</h4>
+                            <p class="text-gray-300">アフェクティブコンピューティングは感情「認識」を進歩させましたが、サール、チャルマーズ、ベルクソンらが示す哲学的ハードルから、AIが人間のように主観的に「感じる」ことは原理的に困難です。</p>
+                        </div>
+                    </div>
+                    <h3 class="subsection-title">哲学的洞察を踏まえたAIの能力と限界の再定義</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIの能力評価では、機能的側面（タスク実行効率）と現象的側面（主観的経験の有無）の区別が重要です。現在のAIは機能面で発展する一方、現象面では本質的限界を抱えています。「見る」「照らす」「感じる」という人間的メタファーの適用は有効性と限界を併せ持ち、過度な擬人化を避ける必要があります。</p>
+                    </div>
+                    <h3 class="subsection-title">人間とAIの共生社会に向けた学際的アプローチの提言</h3>
+                    <div class="card">
+                        <p class="text-gray-300">AIの健全な発展と責任ある社会実装には、技術者だけでなく、哲学者、倫理学者、社会科学者、法学者、市民を含む学際的協力と継続的対話が不可欠です。</p>
+                        <ul class="list-disc list-inside space-y-1 mt-2 text-gray-400">
+                            <li>AI倫理の確立と浸透</li>
+                            <li>適切なガバナンス体制と法規制の整備</li>
+                            <li>AIに関する社会全体の理解とリテラシー向上</li>
+                        </ul>
+                        <p class="mt-3 text-gray-300">目指すべきは、人間の幸福と社会全体のウェルビーイングに貢献する「人間中心のAI」です。技術進歩そのものを目的化せず、人類の幸福との調和を常に問い続ける必要があります。</p>
+                        <p class="mt-3 text-gray-300">今後は、人間的アナロジーに過度に囚われず、AIが持つ独自の能力（膨大なデータからのパターン発見、複雑な相関関係のモデリング、「非人間的」視点からの問題解決など）に着目し、それらを人間の知性や社会の発展に建設的に活かすことが、より現実的で実りあるAIとの共生関係の構築に繋がるでしょう。AIを「異質な知性」として理解し、倫理的な枠組みの中で協働していく未来を目指すべきです。</p>
+                    </div>
+                </div>`
+            }
+        };
+
+        const xaiTechniques = [ /* ... コード①のxaiTechniques ... */ 
+            { technique: "LIME", principle: "個々の予測の周辺で、解釈可能な単純なモデル（代理モデル）を学習し、局所的な説明を生成する。", strengths: "モデル非依存、様々なデータ形式に適用可能、人間が理解しやすい説明。", limitations: "大局的な説明には不向き、代理モデルの忠実性に依存、説明の安定性が低い場合がある。", use_cases: "画像分類、テキスト分類、表形式データ予測の説明。" },
+            { technique: "SHAP", principle: "協力ゲーム理論のシャープレイ値に基づき、各特徴量が予測に対してどの程度貢献したかを定量的に算出する。", strengths: "モデル非依存、理論的裏付けが強固、局所説明と大局説明の両方が可能、特徴量間の相互作用も考慮可能。", limitations: "計算コストが高い場合がある、特に複雑なモデルや大規模データの場合。", use_cases: "金融（信用スコアリング）、医療（疾患リスク予測）、マーケティング。" },
+            { technique: "Grad-CAM", principle: "CNNの最終畳み込み層の勾配情報を利用し、特定のクラス予測に寄与した入力画像中の重要領域を可視化する（ヒートマップ）。", strengths: "画像認識タスクに特化、視覚的に分かりやすい説明、比較的計算コストが低い。", limitations: "CNNベースのモデルに限定される、解像度が低い場合がある、クラス判別的でない特徴も強調する可能性。", use_cases: "医療画像診断、自動運転、物体検出の説明。" },
+            { technique: "Anchor", principle: "特定の予測に対して、その予測結果が変わらないような十分条件となるIF-THENルール（アンカー）を探索する。", strengths: "高い精度で局所的なルールを提示、人間が理解しやすいルール形式。", limitations: "複雑なモデルでは単純なルールが見つからない場合がある、カバレッジが低い場合がある。", use_cases: "テキスト分類、画像分類の説明。" },
+            { technique: "DeepLIFT", principle: "ニューラルネットワークにおいて、ある入力に対する各ニューロンの出力を基準値と比較し、その差分を伝播させることで特徴量の貢献度を算出する。", strengths: "勾配飽和の問題を回避可能、ベースライン（基準値）の設定が重要。", limitations: "適切なベースラインの選択が難しい場合がある、実装が複雑な場合がある。", use_cases: "深層学習モデル全般、特にゲノム解析などでの特徴量重要度評価。" }
+        ];
+
+        const philosophyFeelingTechniques = [ /* ... コード①のphilosophyFeelingTechniques ... */ 
+            { philosopher: "ジョン・サール", argument: "中国語の部屋、志向性の問題", implication: "記号操作だけでは意味理解や真の感情は生じない。AIの「感情」は表面的・模倣的である可能性。" },
+            { philosopher: "デイヴィッド・チャルマーズ", argument: "意識のハードプロブレム、クオリア", implication: "物理的情報処理からなぜ主観的経験が生じるのかは説明不能。AIがクオリア（感情の質的感覚）を持つ保証はない。" },
+            { philosopher: "ヒューバート・ドレイファス", argument: "身体性、状況性、暗黙知", implication: "人間の知性や感情は身体と状況に根差す。身体を持たないAIが人間のように「感じる」ことは困難。" },
+            { philosopher: "アンリ・ベルクソン", argument: "持続、質的記憶、直観", implication: "AIの時間処理は空間化された時間であり、生の経験の連続性・質的多様性（持続）を欠く。人間のような時間意識や感情体験は困難。" }
+        ];
+
+        const contentArea = document.getElementById('content-area');
+        const navButtons = document.querySelectorAll('#main-nav button');
+        let philosophicalChallengesChartInstance = null;
+        let cvMarketGrowthChartInstance = null;
+        let biasImpactChartInstance = null;
+        let affectiveComputingMarketChartInstance = null;
+
+        function renderContent(sectionKey) {
+            // (SPAコンテンツレンダリングロジック - 変更なし、ただしクイズ表示ロジックを修正)
+            if (sectionKey === 'quiz') {
+                contentArea.innerHTML = ''; 
+                document.getElementById('quiz-section-container').style.display = 'block';
+                initializeQuizApp(); 
+                return;
+            }
+            document.getElementById('quiz-section-container').style.display = 'none';
+
+
+            if (!reportData[sectionKey]) return;
+
+            contentArea.innerHTML = `
+                <h2 class="section-title scroll-animate text-animate">${reportData[sectionKey].title}</h2>
+                ${reportData[sectionKey].content}
+            `;
+            
+            if (sectionKey === 'illuminating') renderXaiTable();
+            if (sectionKey === 'feeling') renderPhilosophyFeelingTable();
+            if (sectionKey === 'philosophers') renderPhilosophicalChallengesChart();
+            if (sectionKey === 'seeing') {
+                renderCvMarketGrowthChart();
+                renderBiasImpactChart();
+            }
+            if (sectionKey === 'feeling') { 
+                renderAffectiveComputingMarketChart();
+            }
+
+
+            initializeTooltips();
+            setupScrollAnimationsForContent(); 
+        }
+        
+        function renderXaiTable() { /* ... コード①のrenderXaiTable ... */ 
+            const container = document.getElementById('xaiTableContainer');
+            if (!container) return;
+            let tableHTML = '<table class="w-full border-collapse table-interactive"><thead><tr><th>手法</th><th>原理</th><th>長所</th><th>短所</th><th>主な応用分野</th></tr></thead><tbody>';
+            xaiTechniques.forEach(item => {
+                tableHTML += `<tr><td class="font-semibold">${item.technique}</td><td>${item.principle}</td><td>${item.strengths}</td><td>${item.limitations}</td><td>${item.use_cases}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+
+        function renderPhilosophyFeelingTable() { /* ... コード①のrenderPhilosophyFeelingTable ... */ 
+            const container = document.getElementById('philosophyFeelingTableContainer');
+            if (!container) return;
+            let tableHTML = '<table class="w-full border-collapse table-interactive"><thead><tr><th>哲学者</th><th>主要な議論/概念</th><th>AIが「感じる」ことへの含意</th></tr></thead><tbody>';
+            philosophyFeelingTechniques.forEach(item => {
+                tableHTML += `<tr><td class="font-semibold">${item.philosopher}</td><td>${item.argument}</td><td>${item.implication}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+        
+        const CHART_TEXT_COLOR = '#e0e0e0'; 
+        const CHART_GRID_COLOR = 'rgba(255,255,255,0.1)';
+
+        function renderPhilosophicalChallengesChart() { /* ... コード①のrenderPhilosophicalChallengesChart ... */ 
+            const ctx = document.getElementById('philosophicalChallengesChart')?.getContext('2d');
+            if (!ctx) return;
+            if (philosophicalChallengesChartInstance) philosophicalChallengesChartInstance.destroy();
+            
+            philosophicalChallengesChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: philosophyFeelingTechniques.map(p => p.philosopher),
+                    datasets: [{
+                        label: 'AIが「感じる」ことへの哲学的課題の概念的影響度',
+                        data: [90, 95, 85, 80],
+                        backgroundColor: ['rgba(54, 162, 235, 0.7)','rgba(255, 99, 132, 0.7)','rgba(75, 192, 192, 0.7)','rgba(255, 206, 86, 0.7)'],
+                        borderColor: ['#36A2EB','#FF6384','#4BC0C0','#FFCE56'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    scales: {
+                        x: { beginAtZero: true, max: 100, title: { display: true, text: '概念的影響度 (0-100)', color: CHART_TEXT_COLOR }, ticks: { color: CHART_TEXT_COLOR }, grid: { color: CHART_GRID_COLOR } },
+                        y: { ticks: { color: CHART_TEXT_COLOR, autoSkip: false, callback: function(value) { const label = this.getLabelForValue(value); return label.length > 10 ? label.match(/.{1,10}/g) : label; } }, grid: { color: CHART_GRID_COLOR } }
+                    },
+                    plugins: { legend: { display: false }, tooltip: { titleColor: '#fff', bodyColor: '#fff', backgroundColor: 'rgba(0,0,0,0.8)' } }
+                }
+            });
+        }
+        
+        function renderCvMarketGrowthChart() { /* ... コード②のrenderCvMarketGrowthChart ... */ 
+            const ctx = document.getElementById('cvMarketGrowthChart')?.getContext('2d');
+            if (!ctx) return;
+            if (cvMarketGrowthChartInstance) cvMarketGrowthChartInstance.destroy();
+            cvMarketGrowthChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['2020', '2021', '2022', '2023', '2024(予測)', '2025(予測)', '2026(予測)', '2027(予測)'],
+                    datasets: [{
+                        label: 'コンピュータビジョン市場規模 (億ドル)',
+                        data: [100, 150, 220, 310, 450, 620, 850, 1100],
+                        borderColor: '#118AB2', backgroundColor: 'rgba(17, 138, 178, 0.2)', fill: true, tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: CHART_TEXT_COLOR }, grid: { color: CHART_GRID_COLOR } }, y: { ticks: { color: CHART_TEXT_COLOR }, grid: { color: CHART_GRID_COLOR } } }, plugins: { legend: { labels: { color: CHART_TEXT_COLOR } }, tooltip: { titleColor: '#fff', bodyColor: '#fff', backgroundColor: 'rgba(0,0,0,0.8)' } } }
+            });
+        }
+
+        function renderBiasImpactChart() { /* ... コード②のrenderBiasImpactChart ... */
+            const ctx = document.getElementById('biasImpactChart')?.getContext('2d');
+            if (!ctx) return;
+            if (biasImpactChartInstance) biasImpactChartInstance.destroy();
+            biasImpactChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['特定グループA', '特定グループB', '特定グループC'],
+                    datasets: [{
+                        label: '認識精度 (%)',
+                        data: [95, 70, 82],
+                        backgroundColor: ['#06D6A0AA', '#FF6B6BAA', '#FFD166AA'],
+                        borderColor: ['#05C18D', '#F05A5A', '#F0C050'], borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: CHART_TEXT_COLOR }, grid: { color: CHART_GRID_COLOR } }, y: { ticks: { color: CHART_TEXT_COLOR }, grid: { display: false } } }, plugins: { legend: { labels: { color: CHART_TEXT_COLOR } }, tooltip: { titleColor: '#fff', bodyColor: '#fff', backgroundColor: 'rgba(0,0,0,0.8)' } } }
+            });
+        }
+        
+        function renderAffectiveComputingMarketChart() { /* ... コード②のrenderAffectiveComputingMarketChart ... */
+            const ctx = document.getElementById('affectiveComputingMarketChart')?.getContext('2d');
+            if (!ctx) return;
+            if (affectiveComputingMarketChartInstance) affectiveComputingMarketChartInstance.destroy();
+            affectiveComputingMarketChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['カスタマーサービス', 'ヘルスケア', '教育', 'エンタメ', 'その他'],
+                    datasets: [{
+                        label: '市場構成比 (%)', data: [30, 25, 20, 15, 10],
+                        backgroundColor: ['#118AB2CC', '#06D6A0CC', '#FFD166CC', '#FF6B6BCC', '#073B4CCC'], hoverOffset: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: CHART_TEXT_COLOR, boxWidth: 15, padding: 15 } }, tooltip: { titleColor: '#fff', bodyColor: '#fff', backgroundColor: 'rgba(0,0,0,0.8)' } } }
+            });
+        }
+
+        // サイドバー関連のロジック
+        const sidebar = document.getElementById('left-sidebar');
+        const sidebarTrigger = document.getElementById('sidebar-trigger');
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        const bodyElement = document.body;
+
+        sidebarTrigger.addEventListener('click', (event) => {
+            event.stopPropagation(); // イベントの伝播を止める
+            sidebar.classList.toggle('open');
+            bodyElement.classList.toggle('sidebar-open');
+            sidebarTrigger.setAttribute('aria-expanded', sidebar.classList.contains('open'));
+        });
+
+        document.addEventListener('click', (event) => {
+            if (window.innerWidth > 768 && !sidebar.contains(event.target) && !sidebarTrigger.contains(event.target) && sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                bodyElement.classList.remove('sidebar-open');
+                sidebarTrigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetSection = button.dataset.target;
+                renderContent(targetSection);
+                navButtons.forEach(btn => {
+                    btn.classList.remove('nav-button-active');
+                    btn.classList.add('nav-button-inactive');
+                });
+                button.classList.add('nav-button-active');
+                button.classList.remove('nav-button-inactive');
+                
+                const effectIndexToSwitch = parseInt(button.dataset.vantaEffectIndex);
+                if (!isNaN(effectIndexToSwitch)) {
+                    switchToEffectByIndex(effectIndexToSwitch);
+                }
+
+                if (mainContentWrapper) { 
+                     setTimeout(() => { 
+                        mainContentWrapper.scrollTo({top: 0, behavior: 'smooth'});
+                    }, 100);
+                }
+                // スマホ表示でメニュー選択後に閉じる
+                if (window.innerWidth <= 768 && sidebar.classList.contains('open')) { 
+                    sidebar.classList.remove('open');
+                    bodyElement.classList.remove('sidebar-open');
+                    sidebarTrigger.setAttribute('aria-expanded', 'false');
+                }
+            });
+        });
+
+        function initializeTooltips() { /* ... コード①のinitializeTooltips ... */ }
+        
+        window.toggleExpand = function(element) { /* ... コード①のtoggleExpand ... */ 
+            const content = element.nextElementSibling;
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                element.textContent = element.textContent.replace('詳しく', '閉じる');
+            } else {
+                content.classList.add('hidden');
+                element.textContent = element.textContent.replace('閉じる', '詳しく');
+            }
+        }
+
+        // クイズ関連のスクリプト
+        const quizData = { /* ... コード③のquizDataをここに記述 ... */ 
+            "questions": [
+            {
+              "question": "レポート第1部で言及されているコンピュータビジョン技術のうち、低品質なデータセットにおける物体検出精度を向上させるフレームワークとして紹介されているものはどれですか？",
+              "answerOptions": [
+                { "text": "YOLOシリーズ", "rationale": "YOLOシリーズはリアルタイム性と高精度を両立するモデルとして言及されていますが、低品質データセットへの対応を主眼としたフレームワークとしてはDiffYOLOが紹介されています。", "isCorrect": false },
+                { "text": "tsuzumi", "rationale": "tsuzumiはNTTが開発した大規模言語モデルで、視覚読解能力を持つとされていますが、低品質データセットでの物体検出に特化したフレームワークではありません。", "isCorrect": false },
+                { "text": "DiffYOLO", "rationale": "DiffYOLOは、高品質画像で訓練されたモデルを活用し、ノイズの多い実環境下でも物体を正確に検出する能力向上に貢献する新しいフレームワークとして紹介されています。", "isCorrect": true },
+                { "text": "Grad-CAM", "rationale": "Grad-CAMは説明可能なAI（XAI）の技術であり、AIが判断の根拠とした画像中の領域を可視化する手法ですが、物体検出フレームワークそのものではありません。", "isCorrect": false }
+              ], "hint": "高品質な画像で訓練されたモデルを活用し、ノイズの多い環境での精度向上を目指す技術です。"
+            },
+            {
+              "question": "AIの「見る」能力に関する哲学的考察で、ヒューバート・ドレイファスがAI批判において重視した、人間の知性の特徴は何ですか？",
+              "answerOptions": [
+                { "text": "記号処理能力と形式化可能な知識", "rationale": "ドレイファスは、人間の知性の多くが非記号的であり、形式化が困難な「ノウハウ」に基づくと主張し、初期AIの記号処理中心のアプローチを批判しました。", "isCorrect": false },
+                { "text": "身体性、状況性、および「ノウハウ（knowing-how）」", "rationale": "ドレイファスは、人間の知性が物理的な身体を持ち、実世界と相互作用する中で培われる「ノウハウ」や状況に応じた理解に根差していると論じました。", "isCorrect": true },
+                { "text": "膨大なデータからの統計的パターン認識能力", "rationale": "これは現代のAIが得意とする能力ですが、ドレイファスが人間の知性の本質として強調したのは、これとは異なる身体性や状況に根差した理解です。", "isCorrect": false },
+                { "text": "意識的な記号的推論に基づく問題解決", "rationale": "ドレイファスは、専門家の持つ知見の多くが意識的な記号的推論を伴わない直感的な理解であると主張しました。", "isCorrect": false }
+              ], "hint": "AIが欠いているとされる、実世界との相互作用を通じて獲得される知性の側面を考えてみましょう。"
+            },
+            {
+              "question": "レポート第2部で論じられている「ブラックボックス問題」とは、AIに関してどのような問題点を指していますか？",
+              "answerOptions": [
+                { "text": "AIが学習データに含まれるバイアスを増幅してしまう問題。", "rationale": "データバイアスはAIの重要な問題ですが、「ブラックボックス問題」が直接指すのは、判断プロセスの不透明性です。", "isCorrect": false },
+                { "text": "AIの内部の意思決定プロセスが人間にとって不透明であるという問題。", "rationale": "AIが高い性能を発揮する一方で、その結論に至った理由や根拠を人間が理解することが困難な状況を「ブラックボックス問題」と呼んでいます。", "isCorrect": true },
+                { "text": "AIを開発・運用する上での責任の所在が曖昧になる問題。", "rationale": "責任の分散はAI倫理の重要な課題ですが、「ブラックボックス問題」は主に意思決定プロセスの理解困難性を指します。", "isCorrect": false },
+                { "text": "AIが生成する情報が必ずしも真実を反映しないパフォーマンスである可能性の問題。", "rationale": "これはリオタールのパフォーマティビティの概念に関連する論点であり、「ブラックボックス問題」の直接的な定義ではありません。", "isCorrect": false }
+              ], "hint": "AIの判断結果は分かっても、なぜそうなったのかが分からない状況を指します。"
+            },
+            {
+              "question": "説明可能なAI（XAI）の技術の一つであるSHAPは、どのような原理に基づいて特徴量の貢献度を算出しますか？",
+              "answerOptions": [
+                { "text": "個々の予測の周辺で解釈可能な単純な代理モデルを学習する。", "rationale": "これはLIME (Local Interpretable Model-agnostic Explanations) の原理に関する説明です。", "isCorrect": false },
+                { "text": "CNNの最終畳み込み層の勾配情報を利用して重要領域を可視化する。", "rationale": "これはGrad-CAM (Gradient-weighted Class Activation Mapping) の原理に関する説明です。", "isCorrect": false },
+                { "text": "協力ゲーム理論のシャープレイ値に基づき、各特徴量の予測への貢献度を定量的に算出する。", "rationale": "SHAP (SHapley Additive exPlanations) は、シャープレイ値を用いて各特徴量が予測結果に対してどの程度貢献したかを評価します。", "isCorrect": true },
+                { "text": "予測結果が変わらない十分条件となるIF-THENルールを探索する。", "rationale": "これはAnchorの原理に関する説明です。", "isCorrect": false }
+              ], "hint": "ゲーム理論における概念を利用して、各プレイヤー（特徴量）の貢献度を評価する手法です。"
+            },
+            {
+              "question": "ジャン＝フランソワ・リオタールのポストモダン的視点からXAIを考察した際、XAIが提供する「説明」が陥る可能性のある危険性として、レポートでは何が指摘されていますか？",
+              "answerOptions": [
+                { "text": "説明の精度と応答速度のトレードオフ。", "rationale": "これはXAI技術の一般的な課題ですが、リオタールの視点から特に指摘される危険性とは異なります。", "isCorrect": false },
+                { "text": "ユーザーごとに最適な説明の形式が異なるため、万能な説明が難しいこと。", "rationale": "これもXAIの課題の一つですが、リオタールの議論の中心は知識のあり方の変容です。", "isCorrect": false },
+                { "text": "「説明」が真の理解を促すのではなく、システムの効率性や正当性を演出する「パフォーマティビティ」に陥る可能性。", "rationale": "リオタールは知識の価値基準が「真理性」から「有用性」や「効率性」（パフォーマティビティ）へ移行したと指摘し、XAIの説明もこの論理に支配される可能性を示唆しています。", "isCorrect": true },
+                { "text": "AIモデル更新時のXAIシステムのメンテナンスコストが高いこと。", "rationale": "これは運用上の課題であり、リオタールの哲学的考察から直接導かれる危険性ではありません。", "isCorrect": false }
+              ], "hint": "知識が「真実」であることよりも「役に立つ」ことが重視される社会における「説明」のあり方を考えてみましょう。"
+            },
+            {
+              "question": "レポート第3部で紹介されているアフェクティブコンピューティングとは、どのような技術分野ですか？",
+              "answerOptions": [
+                { "text": "AIが人間のように主観的な意識やクオリアを持つことを目指す分野。", "rationale": "主観的意識やクオリアはアフェクティブコンピューティングの現在の到達点ではなく、むしろ哲学的難問とされています。", "isCorrect": false },
+                { "text": "人間の感情をAIが認識、解釈、処理し、シミュレートすることを目指す分野。", "rationale": "アフェクティブコンピューティングは、テキスト、音声、画像などから人間の感情に関連する情報を扱い、感情を理解・模倣しようとする技術です。", "isCorrect": true },
+                { "text": "AIの意思決定プロセスを人間が理解可能な形で提示することを目指す分野。", "rationale": "これは説明可能なAI（XAI）の目的であり、アフェクティブコンピューティングとは異なります。", "isCorrect": false },
+                { "text": "AIが身体性を持ち、実世界と相互作用しながら学習することを目指す分野。", "rationale": "これは身体化された認知や状況的AIに関連する概念であり、アフェクティブコンピューティングの直接的な定義ではありません。", "isCorrect": false }
+              ], "hint": "AIと人間の「感情」の関わり合いに関する技術です。"
+            },
+            {
+              "question": "ジョン・サールの「中国語の部屋」の思考実験が、AIの感情理解能力に関して示唆していることは何ですか？",
+              "answerOptions": [
+                { "text": "AIはいずれ人間と同様の感情体験を獲得できるという可能性。", "rationale": "「中国語の部屋」はむしろ、記号操作だけでは真の理解や感情体験は生じないという懐疑的な見方を示しています。", "isCorrect": false },
+                { "text": "AIが感情を理解するためには、より大規模なデータセットと計算資源が必要であること。", "rationale": "サールの議論は計算資源の量ではなく、記号操作と意味理解の質的な違いに焦点を当てています。", "isCorrect": false },
+                { "text": "AIが感情的な応答をしても、それは記号操作に過ぎず、内的な感情体験や意味理解を伴わない可能性があること。", "rationale": "この思考実験は、形式的なルールに従う記号処理だけでは、意味内容（セマンティクス）や志向性は生じないという主張に基づいています。", "isCorrect": true },
+                { "text": "AIの感情認識は、異文化間の感情表現の差異を乗り越えることが最大の課題であること。", "rationale": "異文化理解はアフェクティブコンピューティングの課題ですが、「中国語の部屋」が直接的に論じているのはより根本的な理解の問題です。", "isCorrect": false }
+              ], "hint": "部屋の中の人がルールブックに従って記号を操作しても、その記号の意味を理解しているわけではない、というアナロジーです。"
+            },
+            {
+              "question": "デイヴィッド・チャルマーズが提唱した「意識のハードプロブレム」とは、具体的にどのような問いを指しますか？",
+              "answerOptions": [
+                { "text": "脳がいかにして知覚情報を処理し、記憶し、行動を制御するのかという問い。", "rationale": "これはチャルマーズが「イージープロブレム」として分類した問題群に属します。", "isCorrect": false },
+                { "text": "AIが人間と見分けがつかないほど自然な行動を示すことができるかという問い。", "rationale": "これはチューリングテストなどに関連しますが、「ハードプロブレム」の核心ではありません。", "isCorrect": false },
+                { "text": "なぜ、そしてどのようにして、物理的な情報処理システムが主観的な質的経験（クオリア）を生み出すのかという問い。", "rationale": "「ハードプロブレム」は、情報処理の機能的な側面から主観的な体験の質（クオリア）がどのようにして生じるのかという、説明のギャップに関する根源的な問いです。", "isCorrect": true },
+                { "text": "AIが倫理的な判断を下すためのアルゴリズムをどのように設計すべきかという問い。", "rationale": "これはAI倫理の重要な課題ですが、「ハードプロブレム」が指す意識の主観性の問題とは異なります。", "isCorrect": false }
+              ], "hint": "「赤い色を見るという感じ」のような、一人称的な体験の「質感」はどこから来るのか、という問題です。"
+            },
+            {
+              "question": "アンリ・ベルクソンの哲学における「持続（durée）」の概念は、AIが人間のように「感じる」ことの困難さについて何を示唆していますか？",
+              "answerOptions": [
+                { "text": "AIが「持続」をシミュレートするには、より高度な並列処理能力が必要であること。", "rationale": "ベルクソンの「持続」は量的な計算能力の問題ではなく、時間意識の質的な違いを指しています。", "isCorrect": false },
+                { "text": "AIの時間処理は客観的で均質的であり、過去・現在・未来が相互浸透する人間の質的な時間意識（持続）を欠いていること。", "rationale": "ベルクソンは、科学が扱う空間化された時間と、意識が体験する分割不可能な「持続」とを区別し、後者がAIにはないことを示唆しています。", "isCorrect": true },
+                { "text": "AIが「直観」を獲得すれば、「持続」に近い時間意識を持つことができる可能性があること。", "rationale": "ベルクソンは直観を重視しましたが、それがAIの現在の時間処理の限界を直接的に解決するとは論じられていません。", "isCorrect": false },
+                { "text": "AIの記憶メカニズムを改善することで、ベルクソン的なダイナミックな記憶に近づけること。", "rationale": "AIの記憶とベルクソンの記憶論は根本的に異なり、単なるメカニズム改善では「持続」の質は得られないと示唆されます。", "isCorrect": false }
+              ], "hint": "時計で測れる時間と、私たちが内面的に体験する時間の流れの違いを考えてみましょう。"
+            },
+            {
+              "question": "レポートの結論部分で、AIの能力を評価する際に明確に区別すべき二つの側面として挙げられているものは何ですか？",
+              "answerOptions": [
+                { "text": "技術的側面と倫理的側面", "rationale": "これらはAIを議論する上で重要な側面ですが、結論で能力評価の区別として特に強調された二つの側面とは異なります。", "isCorrect": false },
+                { "text": "機能的側面と現象的側面", "rationale": "レポートの結論では、AIが特定のタスクを実行できるかという「機能的側面」と、主観的経験や意識を伴うかという「現象的側面」を区別することが重要だと述べています。", "isCorrect": true },
+                { "text": "理論的側面と応用的側面", "rationale": "これらもAI研究の分類ですが、結論でAIの能力評価の核心として挙げられた区別ではありません。", "isCorrect": false },
+                { "text": "ハードウェア的側面とソフトウェア的側面", "rationale": "これらはAIシステムの構成要素ですが、能力評価の際の哲学的区別として結論で述べられたものではありません。", "isCorrect": false }
+              ], "hint": "AIが「何ができるか」ということと、「どのように体験しているか（あるいはしていないか）」ということを分けて考える必要性です。"
+            }
+          ]
+        };
+        const quizMainTitleElement = document.getElementById('quiz-main-title');
+        const quizMainTitleUnderline = quizMainTitleElement.querySelector('.underline');
+        const quizIntroTextElement = document.getElementById('quiz-intro');
+        const quizQuestionTextElement = document.getElementById('question-text');
+        const quizQuestionContentSpan = quizQuestionTextElement.querySelector('.question-content');
+        const quizQuestionUnderline = quizQuestionTextElement.querySelector('.underline');
+        const quizOptionsAreaElement = document.getElementById('options-area');
+        const quizHintButtonElement = document.getElementById('hint-button');
+        const quizHintTextElement = document.getElementById('hint-text');
+        const quizHintAreaElement = document.getElementById('hint-area');
+        const quizFeedbackAreaElement = document.getElementById('feedback-area');
+        const quizNextButtonElement = document.getElementById('next-button');
+        const quizResultAreaElement = document.getElementById('result-area');
+        const quizScoreTextElement = document.getElementById('score-text');
+        const quizRestartButtonElement = document.getElementById('restart-button');
+        const quizContainerElement = document.getElementById('quiz-container');
+        let quizCurrentQuestionIndex = 0;
+        let quizScore = 0;
+        let quizQuestions = [];
+        let quizAnimationTimeline;
+        let quizAnimationsEnabled = false; 
+
+        function typeTextAnimation(element, text, durationPerChar = 50, callback) { /* ... コード③のtypeTextAnimation ... */ 
+            element.innerHTML = ''; let i = 0;
+            function type() {
+                if (i < text.length) { element.innerHTML += text.charAt(i); i++; setTimeout(type, durationPerChar); }
+                else if (callback) { callback(); }
+            }
+            type();
+        }
+        
+        function quizInitialLoadAnimations() { /* ... コード③のquizInitialLoadAnimations ... */ 
+            if (!quizAnimationsEnabled || !quizAnimationTimeline) return;
+            quizAnimationTimeline.clear();
+            quizAnimationTimeline
+                .add(Tween24.Tween.fromTo(quizMainTitleElement, 0.8, { opacity: 0, y: 30 }, { opacity: 1, y: 0, ease: Tween24.Ease.easeOutQuart }))
+                .add(Tween24.Tween.to(quizMainTitleUnderline, 0.6, { width: '30%', ease: Tween24.Ease.easeOutCubic }), "-=0.4")
+                .add(Tween24.Tween.fromTo(quizIntroTextElement, 0.7, { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: Tween24.Ease.easeOutCubic }), "-=0.5")
+                .play();
+        }
+
+        function shuffleArray(array) { /* ... コード③のshuffleArray ... */ 
+            for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } 
+        }
+
+        function startQuiz() { /* ... コード③のstartQuiz ... */ 
+            quizQuestions = [...quizData.questions];
+            shuffleArray(quizQuestions);
+            quizCurrentQuestionIndex = 0; quizScore = 0;
+            
+            quizResultAreaElement.style.display = 'none';
+            quizContainerElement.style.display = 'block';
+
+            if (quizAnimationsEnabled) quizContainerElement.classList.add('is-animating');
+            else { quizContainerElement.classList.remove('is-animating'); quizContainerElement.style.opacity = 1; quizContainerElement.style.transform = 'translateY(0px)'; }
+
+            document.getElementById('question-area').style.display = 'block';
+            quizOptionsAreaElement.style.display = 'block';
+            quizHintButtonElement.style.display = 'inline-block';
+            quizHintAreaElement.style.display = 'none';
+            quizNextButtonElement.style.display = 'none';
+            quizFeedbackAreaElement.innerHTML = '';
+            
+            loadQuizQuestion();
+        }
+
+        function loadQuizQuestion() { /* ... コード③のloadQuizQuestion ... */ 
+            if (quizCurrentQuestionIndex < quizQuestions.length) {
+                const currentQuestion = quizQuestions[quizCurrentQuestionIndex];
+                quizQuestionContentSpan.textContent = '';
+                if (quizAnimationsEnabled) {
+                    quizQuestionTextElement.classList.add('is-animating');
+                    typeTextAnimation(quizQuestionContentSpan, `Q${quizCurrentQuestionIndex + 1}: ${currentQuestion.question}`, 30, () => {
+                        Tween24.Tween.to(quizQuestionUnderline, 0.5, { width: '70%', ease: Tween24.Ease.easeOutCubic }).play();
+                    });
+                } else {
+                    quizQuestionTextElement.classList.remove('is-animating');
+                    quizQuestionContentSpan.textContent = `Q${quizCurrentQuestionIndex + 1}: ${currentQuestion.question}`;
+                    quizQuestionUnderline.style.width = '70%';
+                }
+
+                quizOptionsAreaElement.innerHTML = ''; quizFeedbackAreaElement.innerHTML = '';
+                quizHintAreaElement.style.display = 'none'; quizHintButtonElement.disabled = false;
+                quizHintButtonElement.style.display = 'inline-block'; quizNextButtonElement.style.display = 'none';
+
+                const shuffledAnswerOptions = [...currentQuestion.answerOptions];
+                shuffleArray(shuffledAnswerOptions);
+                let optionDelay = quizAnimationsEnabled ? 0.3 : 0;
+
+                shuffledAnswerOptions.forEach((option, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = option.text; button.classList.add('option-button');
+                    if (quizAnimationsEnabled) button.classList.add('is-animating');
+                    else { button.classList.remove('is-animating'); button.style.opacity = 1; button.style.transform = 'translateY(0px)'; }
+                    button.addEventListener('click', () => selectQuizAnswer(option, currentQuestion.answerOptions, button));
+                    quizOptionsAreaElement.appendChild(button);
+                    if (quizAnimationsEnabled) {
+                        Tween24.Tween.fromTo(button, 0.5, { opacity: 0, y: 20 }, { opacity: 1, y: 0, delay: optionDelay + index * 0.1, ease: Tween24.Ease.easeOutCubic }).play();
+                    }
+                });
+            } else { showQuizResults(); }
+        }
+
+        function selectQuizAnswer(selectedOption, allOptions, selectedButton) { /* ... コード③のselectQuizAnswer ... */ 
+            const buttons = quizOptionsAreaElement.querySelectorAll('.option-button');
+            buttons.forEach(button => { button.disabled = true; });
+            quizFeedbackAreaElement.innerHTML = '';
+            let rationaleDelay = quizAnimationsEnabled ? 0 : 0;
+
+            allOptions.forEach(opt => {
+                const rationaleDiv = document.createElement('div');
+                rationaleDiv.classList.add('rationale');
+                if (quizAnimationsEnabled) rationaleDiv.classList.add('is-animating');
+                else { rationaleDiv.classList.remove('is-animating'); rationaleDiv.style.opacity = 1; rationaleDiv.style.transform = 'translateX(0px)'; }
+                
+                let buttonForRationale;
+                buttons.forEach(btn => { if(btn.textContent === opt.text) buttonForRationale = btn; });
+
+                if (opt.isCorrect) { if(buttonForRationale) buttonForRationale.classList.add('correct'); rationaleDiv.classList.add('correct-rationale'); }
+                else if (opt.text === selectedOption.text) { if(buttonForRationale) buttonForRationale.classList.add('incorrect'); rationaleDiv.classList.add('incorrect-rationale'); }
+                else { rationaleDiv.classList.add('plausible-rationale'); }
+                rationaleDiv.innerHTML = `<strong>「${opt.text}」:</strong> ${opt.rationale}`;
+                quizFeedbackAreaElement.appendChild(rationaleDiv);
+
+                if (quizAnimationsEnabled) {
+                    Tween24.Tween.fromTo(rationaleDiv, 0.4, { opacity: 0, x: -20 }, { opacity: 1, x: 0, delay: rationaleDelay, ease: Tween24.Ease.easeOutCubic }).play();
+                    rationaleDelay += 0.1;
+                }
+            });
+
+            if (selectedOption.isCorrect) quizScore++;
+            
+            quizHintButtonElement.style.display = 'none'; quizHintAreaElement.style.display = 'none';
+            quizNextButtonElement.style.display = 'inline-block';
+            if (quizAnimationsEnabled) Tween24.Tween.fromTo(quizNextButtonElement, 0.5, {opacity:0, scale:0.8}, {opacity:1, scale:1, delay: rationaleDelay, ease: Tween24.Ease.elasticOut}).play();
+            else { quizNextButtonElement.style.opacity = 1; quizNextButtonElement.style.transform = 'scale(1)'; }
+        }
+
+        quizHintButtonElement.addEventListener('click', () => { /* ... コード③のhintButtonElement listener ... */ 
+            const currentQuestion = quizQuestions[quizCurrentQuestionIndex];
+            quizHintTextElement.textContent = currentQuestion.hint;
+            quizHintAreaElement.style.display = 'block';
+            if (quizAnimationsEnabled) Tween24.Tween.fromTo(quizHintAreaElement, 0.4, {opacity:0, height:0}, {opacity:1, height: quizHintAreaElement.scrollHeight + 'px', ease: Tween24.Ease.easeOutCubic}).play();
+            else { quizHintAreaElement.style.opacity = 1; quizHintAreaElement.style.height = 'auto'; }
+            quizHintButtonElement.style.display = 'none';
+        });
+
+        quizNextButtonElement.addEventListener('click', () => { /* ... コード③のnextButtonElement listener ... */ 
+            quizCurrentQuestionIndex++;
+            if (quizAnimationsEnabled) {
+                const tl = new Tween24.Timeline();
+                tl.add(Tween24.Tween.to(quizContainerElement, 0.3, {opacity:0, x: -50, ease: Tween24.Ease.easeInCubic}))
+                  .add(() => { loadQuizQuestion(); quizContainerElement.style.transform = 'translateX(50px)'; })
+                  .add(Tween24.Tween.to(quizContainerElement, 0.4, {opacity:1, x: 0, ease: Tween24.Ease.easeOutCubic}))
+                  .play();
+            } else { loadQuizQuestion(); }
+        });
+
+        quizRestartButtonElement.addEventListener('click', () => { /* ... コード③のrestartButtonElement listener ... */ 
+            if (quizAnimationsEnabled) {
+                const tl = new Tween24.Timeline();
+                tl.add(Tween24.Tween.to(quizResultAreaElement, 0.4, {opacity: 0, scale: 0.9, ease: Tween24.Ease.easeInCubic}))
+                  .add(() => { startQuiz(); })
+                  .play();
+            } else { startQuiz(); }
+        });
+
+        function showQuizResults() { /* ... コード③のshowQuizResults ... */ 
+            if (quizAnimationsEnabled) {
+                Tween24.Tween.to(quizContainerElement, 0.4, {opacity: 0, y: 50, ease: Tween24.Ease.easeInCubic, onComplete: () => {
+                    quizContainerElement.style.display = 'none';
+                    quizResultAreaElement.style.display = 'block'; quizResultAreaElement.classList.add('is-animating');
+                    quizScoreTextElement.textContent = `あなたのスコア: ${quizScore} / ${quizQuestions.length}問正解！`;
+                    Tween24.Tween.fromTo(quizResultAreaElement, 0.6, { opacity: 0, scale: 0.8, y: 30 }, { opacity: 1, scale: 1, y: 0, ease: Tween24.Ease.elasticOut, onComplete: () => { quizResultAreaElement.classList.add('is-visible'); }}).play();
+                }}).play();
+            } else {
+                quizContainerElement.style.display = 'none'; quizResultAreaElement.style.display = 'block';
+                quizScoreTextElement.textContent = `あなたのスコア: ${quizScore} / ${quizQuestions.length}問正解！`;
+                quizResultAreaElement.style.opacity = 1; quizResultAreaElement.style.transform = 'scale(1) translateY(0px)';
+            }
+        }
+        
+        function initializeQuizApp() { /* ... コード③のinitializeQuizApp (一部修正) ... */ 
+            if (quizAnimationsEnabled) {
+                if (!quizAnimationTimeline) quizAnimationTimeline = new Tween24.Timeline();
+                quizMainTitleElement.classList.add('is-animating');
+                quizIntroTextElement.classList.add('is-animating');
+                quizQuestionTextElement.classList.add('is-animating');
+                document.querySelectorAll('#quiz-section-container .quiz-section').forEach(s => s.classList.add('is-animating'));
+                quizInitialLoadAnimations();
+            } else {
+                const elementsToReset = [quizMainTitleElement, quizIntroTextElement, quizQuestionTextElement, quizMainTitleUnderline, quizQuestionUnderline];
+                elementsToReset.forEach(el => { if (el) { el.classList.remove('is-animating'); el.style.opacity = 1; if (el.style.transform !== undefined) el.style.transform = 'translateY(0px)'; if (el.classList.contains('underline')) { if (el.parentElement.id === 'quiz-main-title') el.style.width = '30%'; else if (el.parentElement.id === 'question-text') el.style.width = '70%'; } } });
+                document.querySelectorAll('#quiz-section-container .quiz-section, #options-area .option-button, .rationale').forEach(el => { el.classList.remove('is-animating'); el.style.opacity = 1; if (el.style.transform !== undefined) el.style.transform = 'translateY(0px)'; if (el.classList.contains('option-button')) el.style.transform = 'translateY(0px)'; if (el.classList.contains('rationale')) el.style.transform = 'translateX(0px)'; });
+            }
+            startQuiz();
+        }
+
+
+        function setupScrollAnimationsForContent() {
+            if (!quizAnimationsEnabled) { // アニメーションが無効なら、要素を即座に表示
+                contentArea.querySelectorAll('.scroll-animate, .text-animate').forEach(el => {
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0px)';
+                    if (el.classList.contains('text-animate') && !el.classList.contains('text-split-done')) {
+                        const chars = el.querySelectorAll('.char');
+                        if (chars.length === 0) splitTextToChars(el); // まだ分割されていなければ分割
+                         el.querySelectorAll('.char').forEach(char => {
+                            char.style.opacity = '1';
+                            char.style.transform = 'translateY(0px)';
+                        });
+                        el.classList.add('text-split-done');
+                    }
+                    const underlineSpan = el.querySelector('.underline-title .underline');
+                    if (underlineSpan) {
+                        underlineSpan.style.width = '100%';
+                    }
+                });
+                return;
+            }
+
+            const animatedElements = contentArea.querySelectorAll('.scroll-animate');
+            const textAnimatedElements = contentArea.querySelectorAll('.text-animate');
+
+            textAnimatedElements.forEach(el => {
+                if (!el.classList.contains('text-split-done')) { 
+                    splitTextToChars(el);
+                    el.classList.add('text-split-done');
+                }
+            });
+            
+            const observerCallback = (entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const target = entry.target;
+                        // const animationType = target.dataset.animationType; // data-animation-typeは現在未使用
+
+                        if (target.classList.contains('underline-title')) { // underline-titleクラスを持つ要素
+                            const underlineSpan = target.querySelector('.underline');
+                            if (underlineSpan) {
+                                // width をアニメーション
+                                Tween24.Tween.to(underlineSpan.style, 0.8, { width: '100%' }, null, 'easeOutCubic');
+                            }
+                        }
+                        
+                        if (target.classList.contains('text-animate')) {
+                            const chars = target.querySelectorAll('.char');
+                            chars.forEach((char, index) => {
+                                Tween24.Tween.to(char.style, 0.6, { opacity: 1, transform: 'translateY(0px)', delay: index * 0.03 }, null, 'easeOutCubic');
+                            });
+                            // 親要素自体も表示（opacityのみ、transformは文字単位で行うため）
+                            Tween24.Tween.to(target.style, 0.1, { opacity: 1 }, null, 'linear');
+                        } else {
+                             Tween24.Tween.to(target.style, 0.8, { opacity: 1, transform: 'translateY(0px)' }, null, 'easeOutCubic');
+                        }
+                        observer.unobserve(target);
+                    }
+                });
+            };
+
+            const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
+            const observer = new IntersectionObserver(observerCallback, observerOptions);
+            
+            animatedElements.forEach(el => {
+                el.style.opacity = '0'; // JSで初期状態を設定
+                el.style.transform = 'translateY(40px)';
+                observer.observe(el);
+            });
+             textAnimatedElements.forEach(el => { // text-animateも監視対象に
+                el.style.opacity = '0'; // 親要素も初期は非表示
+                el.style.transform = 'translateY(40px)'; // text-animate自体も少し下に
+                observer.observe(el);
+            });
+        }
+        
+        function splitTextToChars(element) {
+            const text = element.textContent.trim(); 
+            element.innerHTML = '';
+            for (let i = 0; i < text.length; i++) {
+                const charSpan = document.createElement('span');
+                charSpan.className = 'char';
+                charSpan.textContent = text[i] === ' ' ? '\u00A0' : text[i];
+                charSpan.style.opacity = '0';
+                charSpan.style.transform = 'translateY(20px)';
+                element.appendChild(charSpan);
+            }
+        }
+
+
+        // 初期化処理
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirstVantaEffect();
+            window.addEventListener('wheel', handleScroll, { passive: false }); // passive:falseでスクロールイベントをキャンセル可能に
+            
+            let attempts = 0;
+            const maxAttempts = 50;
+            const interval = 100;
+            function checkTween24() {
+                if (typeof Tween24 !== 'undefined' && Tween24 && typeof Tween24.Timeline === 'function') {
+                    quizAnimationsEnabled = true;
+                    console.log("Tween24.js loaded. Animations enabled.");
+                } else {
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        setTimeout(checkTween24, interval);
+                    } else {
+                        console.warn("Tween24.js did not load. Animations disabled.");
+                        quizAnimationsEnabled = false;
+                    }
+                }
+                renderContent('intro'); // Tween24.jsのロード状態に関わらず初期コンテンツ表示
+            }
+            checkTween24();
+        });
+
+    </script>
+</body>
+</html>
